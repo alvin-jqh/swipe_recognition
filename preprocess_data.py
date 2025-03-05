@@ -41,7 +41,10 @@ def collate_input(x_coord, y_coord, time, speed, accel, angle):
 
 def process_target(word):
     word = word.lower()
-    return [vocabulary[char] for char in word]
+    indices = [vocabulary[char] for char in word]
+    # one hot encode the characters
+    encoded = [np.eye(27, dtype=int)[idx] for idx in indices]
+    return encoded
 
 def process_data(file_path):
     df = pd.read_json(file_path, lines=True, encoding="utf-16")
