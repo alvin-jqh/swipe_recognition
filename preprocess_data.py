@@ -37,14 +37,22 @@ def calculate_v_a_r(x, y, t):
     return pd.Series([padded_speed, padded_acceleration, padded_angles])
 
 def collate_input(x_coord, y_coord, time, speed, accel, angle):
-    return [[x, y, t, v, a, r] for x, y, t, v, a, r in zip(x_coord, y_coord, time, speed, accel, angle)]
+    x_coord = np.array(x_coord)
+    y_coord = np.array(y_coord)
+    time = np.array(time)
+    speed = np.array(speed)
+    accel = np.array(accel)
+    angle = np.array(angle)
+    result = np.column_stack((x_coord, y_coord, time, speed, accel, angle))
+
+    return result
 
 def process_target(word):
     word = word.lower()
     indices = [vocabulary[char] for char in word]
     # one hot encode the characters
     encoded = [np.eye(27, dtype=int)[idx] for idx in indices]
-    return encoded
+    return np.array(encoded)
 
 def process_data(file_path):
     df = pd.read_json(file_path, lines=True, encoding="utf-16")
@@ -84,6 +92,6 @@ if __name__ == "__main__":
 
     # for combining multiple data files later
     # result_df = pd.concat([df1, df2], ignore_index=True)
-
-    save_path = os.path.join(os.getcwd(), "processed_data", "data_1.parquet")
-    df.to_parquet(save_path)
+    # input in (x, y, t, v, a, angle)
+    save_path = os.path.join(os.getcwd(), "processed_data", "data_1.json")
+    df.to_json(save_path)
