@@ -57,7 +57,7 @@ def encode_word(word):
         encoded.append(vocabulary[letter])
     return torch.Tensor(encoded).to(torch.int16)
 
-class SwipeDataset2(Dataset):
+class SwipeDataset(Dataset):
     # dataset containing the words, swipe touchpoints and tokenized letters
     def __init__(self, data_dir):
         # the directory where the data is being stored
