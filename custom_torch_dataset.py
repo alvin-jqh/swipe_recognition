@@ -11,11 +11,12 @@ vocabulary = {'_': 0, 'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h
               'y': 25, 'z': 26}
 class SwipeDataset(Dataset):
     # dataset containing the words, swipe touchpoints and tokenized letters
-    def __init__(self, data_dir, batch = False):
+    def __init__(self, data_dir, batch = True, batch_first = True):
         # the directory where the data is being stored
         self.data_dir = data_dir
         # controls whether to make the tensors batchable, adds extra dimension to data
         self.batch = batch
+        self.batch_first = batch_first
         # the inputs for the model, in the form (x, y, t, v, a, angle)
         # the first coordinate is shifted to (0,0) at time 0
         self.data = []
@@ -80,15 +81,19 @@ class SwipeDataset(Dataset):
         padded_angles = np.concatenate(([angles[0]], angles))
 
         inputs = np.column_stack((normalized_x,             # x shifted to 0    
-                                normalized_y,             # y shifted to 0
-                                time,                     # time shifted to 0
-                                padded_speed,             # speed in pixels/ms
-                                padded_acceleration,      # accel in pixels/ms/ms
-                                padded_angles)            # in radians between -pi and pi
-                                ).tolist()
+                                  normalized_y,             # y shifted to 0
+                                  time,                     # time shifted to 0
+                                  padded_speed,             # speed in pixels/ms
+                                  padded_acceleration,      # accel in pixels/ms/ms
+                                  padded_angles,            # in radians between -pi and pi
+                                  )).tolist()
         if self.batch:
-            # returns a tensor in shape (T, 1, 6), T is length of sequence, allows for batching
-            return torch.Tensor(inputs).unsqueeze(1)
+            if self.batch_first:
+                # returns a tensor in shape (1, T, 6), T is length of sequence, allows for batching
+                return torch.Tensor(inputs).unsqueeze(0)
+            else:
+                # returns a tensor in shape (T, 1, 6), T is length of sequence, allows for batching
+                return torch.Tensor(inputs).unsqueeze(1)
         else:  
             # returns a tensor in shape (T, 6), T is length of sequence
             return torch.Tensor(inputs)
