@@ -51,7 +51,7 @@ class Decoder(nn.Module):
             word_tensor: word tensors containing indicies of letters (N, max length)
         """
         batch_size = key.shape[0]
-        # maximum word length to output, caps out at 10
+        # maximum word length to output
         word_length = min(self.max_letters, word_tensor.shape[-1]) if word_tensor is not None else self.max_letters
         # create the first decoder input, which is blank inputs
         decoder_input = torch.tensor([0] * batch_size, dtype=torch.long, device=next(self.parameters()).device)
@@ -78,7 +78,7 @@ class Decoder(nn.Module):
                 # for using when not teacher forcing, use model prediction
                 decoder_input = torch.argmax(decoder_output.squeeze(1), dim=-1) # 1D with length N
         
-        probs = F.softmax(decoder_outputs, dim=-1)
+        probs = F.log_softmax(decoder_outputs, dim=-1)
 
         return probs, decoder_hidden, decoder_cell
 
@@ -148,11 +148,11 @@ class Seq2Seq(nn.Module):
             layer_2_cell = torch.cat((encoder_cell[1], encoder_cell[3]), dim=-1)
 
             # project
-            project_h1 = F.softmax(self.hidden_projection_1(layer_1_hidden), dim=-1).unsqueeze(0)
-            project_h2 = F.softmax(self.hidden_projection_2(layer_2_hidden), dim=-1).unsqueeze(0)
+            project_h1 = self.hidden_projection_1(layer_1_hidden).unsqueeze(0)
+            project_h2 = self.hidden_projection_2(layer_2_hidden).unsqueeze(0)
 
-            project_c1 = F.softmax(self.cell_projection_1(layer_1_cell), dim=-1).unsqueeze(0)
-            project_c2 = F.softmax(self.cell_projection_2(layer_2_cell), dim=-1).unsqueeze(0)
+            project_c1 = self.cell_projection_1(layer_1_cell).unsqueeze(0)
+            project_c2 = self.cell_projection_2(layer_2_cell).unsqueeze(0)
 
             # recombine
             encoder_hidden = torch.cat((project_h1, project_h2), dim=0)
@@ -165,12 +165,9 @@ class Seq2Seq(nn.Module):
             key = encoder_output
             value = encoder_output
 
-        # print(encoder_hidden.shape)
-        # print(encoder_cell.shape)
-        # print(encoder_output.shape)
         # decoder
         log_probs, decoder_hidden, decoder_cell = self.decoder(key, value, encoder_hidden, encoder_cell, word_tensors)
-
+        # shape of log_probs (N, T, C)
         return log_probs  
      
      
