@@ -57,28 +57,25 @@ class Decoder(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bidirectional = bidirectional
-        self.lstm = nn.LSTM(input_size=output_size+hidden_size, 
+        self.lstm = nn.LSTM(input_size=hidden_size, 
                             hidden_size=hidden_size, 
                             num_layers=num_layers, 
                             batch_first=True,
                             bidirectional=bidirectional,)
         self.fc = nn.Linear(hidden_size,output_size)
 
-    def forward(self, input, hidden, cell, encoder_output):
+    def forward(self, hidden, cell, encoder_output):
         """
-        param input: (batch_size, 1, 27) next input, either previous output or one hot encoded letters
         param hidden: previous hidden state of decoder  (num_layers, N, hidden_size)
         param cell: previous cell state of decoder  (num_layers, N, hidden_size)
         param encoder_output: encoder output used for attention value and key
         """
 
         query = hidden[-1].unsqueeze(0).permute(1, 0, 2) # (N, num_layers, hidden_size)
-        context = F.scaled_dot_product_attention(query, encoder_output, encoder_output)
-        print(context.shape)
-        input = torch.cat((input, context), dim = -1)   # (N, 1, hidden + output_size)
-
+        context = F.scaled_dot_product_attention(query, encoder_output, encoder_output) # (N, 1, hidden_size)
+        # attention weights used as input for lstm
         # lstm_out shape (N, 1, hidden_size)
-        lstm_out, (hidden, cell) = self.lstm(input, (hidden, cell))
+        lstm_out, (hidden, cell) = self.lstm(context, (hidden, cell))
         output = F.log_softmax(self.fc(lstm_out), dim=-1)
         
         # output: (batch_size, 1, hidden_size)
@@ -104,51 +101,21 @@ class Seq2Seq(nn.Module):
                                num_layers=num_layers,
                                bidirectional=False) # keep decoder unidirectional
     
-    def forward(self, input, target_tensor, force_ratio = 0.5):
+    def forward(self, input):
         """
         param input: (N, T, 6) input sequence
-        param target_tensor: (N, max_word_length) padded word tensors
-        param force_ratio: chance for teacher forcing
         """
         batch_size = input.shape[0]
-        target_length = target_tensor.shape[1]
+
+        # encode the sequence
+        encoder_output, hidden, cell = self.encoder(input)
+
         # where to store all the log probabilities
-        outputs = torch.zeros(batch_size, target_length, self.output_size).to(next(self.parameters()).device)
+        outputs = torch.zeros(batch_size, encoder_output.shape[1], self.output_size).to(next(self.parameters()).device)
 
-        # encode the sequence
-        encoder_output, hidden, cell = self.encoder(input)
-        # get the first decoder input
-        blank = torch.LongTensor([0]*batch_size).to(next(self.parameters()).device)
-        decoder_input = F.one_hot(blank, num_classes=27).unsqueeze(1)   # (N, 1, 27)
-
-        for i in range(target_length):
-            output, hidden, cell = self.decoder(decoder_input, hidden, cell, encoder_output)
-            print(output.shape)
+        for i in range(encoder_output.shape[1]):
+            output, hidden, cell = self.decoder(hidden, cell, encoder_output)
+            # print(output.shape)
             outputs[:,i,:] = output.squeeze(1)
-
-            if i < target_length - 1:
-                teacher_force = torch.rand(1).item() < force_ratio  # probability of being true or false
-                if teacher_force:
-                    decoder_input = F.one_hot(target_tensor[:, i], num_classes=27).unsqueeze(1)
-                else:
-                    decoder_input = output
-
-        return outputs
-    
-    def predict(self, input, max_length):
-        batch_size = input.shape[0]
-        # store outputs
-        outputs = torch.zeros(batch_size, max_length, self.output_size).to(next(self.parameters()).device)
-
-        # encode the sequence
-        encoder_output, hidden, cell = self.encoder(input)
-        # get the first decoder input
-        blank = torch.LongTensor([0]*batch_size).to(next(self.parameters()).device)
-        decoder_input = F.one_hot(blank, num_classes=27).unsqueeze(1)   # (N, 1, 27)
-
-        for i in range(max_length):
-            output, hidden, cell = self.decoder(decoder_input, hidden, cell, encoder_output)
-            outputs[:,i,:] = output.squeeze(1)
-            decoder_input = output
 
         return outputs
