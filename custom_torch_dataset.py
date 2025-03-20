@@ -105,7 +105,7 @@ class SwipeDataset(Dataset):
         
         if self.batch:
             # returns a (1, S) where S is the length of the word
-            return torch.Tensor(encoded).unsqueeze(0)
+            return torch.Tensor(encoded).unsqueeze(0).long()
         else:
             # returns list with length of word
-            return torch.Tensor(encoded)
+            return torch.Tensor(encoded).long()
