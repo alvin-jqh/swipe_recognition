@@ -30,7 +30,7 @@ class SwipeDataset(Dataset):
         for filename in data_files:
             df = pd.read_json(filename, lines=True, encoding="utf-16")
             # remove any datapoints where there are less than 5 datapoints
-            df = df[df["swipe"].apply(lambda x: isinstance(x, list) and len(x) > 5)].reset_index(drop=True)
+            df = df[df["swipe"].apply(lambda x: isinstance(x, list) and 5 < len(x) < 350)].reset_index(drop=True)
             words = df["word"].tolist()
             inputs = df["swipe"].apply(self.handle_data).tolist()
             encoded_words = df["word"].apply(self.encode_word).tolist()
