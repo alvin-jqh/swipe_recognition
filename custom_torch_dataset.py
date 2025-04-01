@@ -4,6 +4,7 @@ import glob
 import os
 import pandas as pd
 import numpy as np
+import re
 
 vocabulary = {'_': 0, 'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8,
               'i': 9, 'j': 10, 'k': 11, 'l': 12, 'm': 13, 'n': 14, 'o': 15, 'p': 16,
@@ -31,6 +32,10 @@ class SwipeDataset(Dataset):
             df = pd.read_json(filename, lines=True, encoding="utf-16")
             # remove any datapoints where there are less than 5 datapoints
             df = df[df["swipe"].apply(lambda x: isinstance(x, list) and 5 < len(x) < 350)].reset_index(drop=True)
+            # drop any data points where there are special characters
+            df = df[df["word"].apply(lambda x: re.match(r'^[a-z]+$', x) is not None)].reset_index(drop=True)
+            # Filter out swipes that result in division by zero during speed calculation
+            df = df[df["swipe"].apply(self.check_division_by_zero)].reset_index(drop=True)
             words = df["word"].tolist()
             inputs = df["swipe"].apply(self.handle_data).tolist()
             encoded_words = df["word"].apply(self.encode_word).tolist()
@@ -48,6 +53,12 @@ class SwipeDataset(Dataset):
         word_tensor = self.word_tensors[index]
 
         return data, word, word_tensor
+    
+    def check_division_by_zero(self, swipes):
+        swipes = np.array(swipes)
+        time = swipes[:, 2]
+        dt = np.diff(time)
+        return not np.any(dt == 0) # return True if there are no zero values in dt
     
     def handle_data(self, swipes):
         swipes = np.array(swipes)
